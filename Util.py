@@ -11,7 +11,8 @@ import xml.etree.ElementTree as ET
 
 def plotImage(img, size):
     fig, ax = plt.subplots(figsize=(size,size))
-    plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    #plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    plt.imshow(img)
     plt.xticks([]),
     plt.yticks([])
     plt.show()
@@ -20,7 +21,8 @@ def subplot(titles, images, rows, imgPerRows, size):
     fig, ax = plt.subplots(figsize=(size,size))
     for i in range(len(images)):
         plt.subplot(rows,imgPerRows,i+1),
-        plt.imshow(cv2.cvtColor(images[i], cv2.COLOR_BGR2RGB))
+        #plt.imshow(cv2.cvtColor(images[i], cv2.COLOR_BGR2RGB))
+        plt.imshow(images[i])
         plt.title(titles[i])
         plt.xticks([]),
         plt.yticks([])
@@ -32,7 +34,8 @@ def readPageImagesAndGroundTruth (folderPageImages, folderGroundTruth, subFolder
         if fileGroundTruth.endswith('.xml') :
             for file in os.listdir(folderPageImages) :
                 if file.endswith('.jpg') and fileGroundTruth.find(file[0:5]) > -1 :
-                    image = cv2.imread(folderPageImages + "/" + file)
+                    #image = cv2.imread(folderPageImages + "/" + file)
+                    image = img_as_float(io.imread(folderPageImages + "/" + file))
                     listImages.append(image)
                     listGroundTruth.append(fileGroundTruth)
     return listImages, listGroundTruth
