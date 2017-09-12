@@ -112,3 +112,70 @@ def segmentImageInSuperpixels (images, numSuperpixels) :
         segments = slic(images[i], n_segments = numSuperpixels, sigma = 5)
         listSegmentsByImage.append(segments)
     return listSegmentsByImage
+
+def paintCentralPointsOrPatchesSegments (image, segments, radio, sizePatch, isPatch) :
+    for (j , segVal) in enumerate(np.unique(segments)) :    
+        mask = np.zeros(image.shape[:2], dtype = "uint8")
+        mask[segments == segVal] = 255
+        cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
+        c = max(cnts, key=cv2.contourArea)
+        M = cv2.moments(c)
+        cX = int(M["m10"] / M["m00"])
+        cY = int(M["m01"] / M["m00"])
+        if isPatch :
+            deltaSizePatch = int(sizePatch/2)
+            cv2.rectangle(image,(cX-deltaSizePatch,cY-deltaSizePatch),(cX+deltaSizePatch,cY+deltaSizePatch),(255,0,0),2)   
+        else :
+            cv2.circle(image, (cX, cY), radio, (0, 0, 255), -1)
+
+def doInputs (images, segmentsByX, xGT, folderGroundTruth, subFolderGroundTruth, sizePatch) :
+    X = [] #list of lists, a collection of patches
+    Y = [] #list of lists, a collection of labels of patches
+    for i in range (len(segmentsByX))                                                
+        segments = segmentsByX[i];
+        listPatches = []
+        
+        
+def doLabels :
+#segmentsByX list of lists
+#xGT list of lists
+def doInputsAndLabelsFromSegments (images, segmentsByX, xGT, folderGroundTruth, subFolderGroundTruth, sizePatch) :
+    X = [] #list of lists, a collection of patches
+    Y = [] #list of lists, a collection of labels of patches
+    regions = ['page','text','decoration','comment','periphery']
+    for i in range (len(segmentsByX)) :
+        segments = segmentsByX[i];
+        listPatches = []
+        listLabels = []
+        for (j , segVal) in enumerate(np.unique(segments)) : 
+            mask = np.zeros(images[i].shape[:2], dtype = "uint8")
+            mask[segments == segVal] = 255
+            cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
+            c = max(cnts, key=cv2.contourArea)
+            M = cv2.moments(c)
+            cX = int(M["m10"] / M["m00"])
+            cY = int(M["m01"] / M["m00"])
+            deltaSizePatch = int(sizePatch/2)
+            roiX = images[i][cY-deltaSizePatch:cY+deltaSizePatch, cX-deltaSizePatch:cX+deltaSizePatch]
+            listPatches.append(roiX)
+            for k in range(len(regions)) :
+                listPolygons = groundThruthFindCountourPointsByRegion(
+                               folderGroundTruth + "/" + subFolderGroundTruth + "/" + xGT[i],
+                               regions[k])
+                for t in range(len(listPolygons)) :
+                    listPointPolygonRegion = listPolygons[t]
+                    if (regions[k] == 'decoration') :
+                        if isInsidePolygon(listPointPolygonRegion, cX, cY) :
+                            listLabels.append('decoration')
+                    elif (regions[k] == 'text') : 
+                        if isInsidePolygon(listPointPolygonRegion, cX, cY) :    
+                            listLabels.append('text')
+                    elif (regions[k] == 'comment') : 
+                        if isInsidePolygon(listPointPolygonRegion, cX, cY) :
+                            listLabels.append('comment')
+                    elif (regions[k] == 'page') : 
+                        if isInsidePolygon(listPointPolygonRegion, cX, cY) : 
+                            listLabels.append('page')
+        X.append(listPatches)
+        Y.append(listLabels)
+    return X , Y
