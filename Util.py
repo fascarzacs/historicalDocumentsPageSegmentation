@@ -128,15 +128,34 @@ def paintCentralPointsOrPatchesSegments (image, segments, radio, sizePatch, isPa
         else :
             cv2.circle(image, (cX, cY), radio, (0, 0, 255), -1)
 
-def doInputs (images, segmentsByX, xGT, folderGroundTruth, subFolderGroundTruth, sizePatch) :
+def doInputs (images, segmentsByX, sizePatch) :
     X = [] #list of lists, a collection of patches
     Y = [] #list of lists, a collection of labels of patches
-    for i in range (len(segmentsByX))                                                
+    for i in range (len(segmentsByX)) :                                                
         segments = segmentsByX[i];
         listPatches = []
+        for (j , segVal) in enumerate(np.unique(segments)) : 
+            mask = np.zeros(images[i].shape[:2], dtype = "uint8")
+            mask[segments == segVal] = 255
+            cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
+            c = max(cnts, key=cv2.contourArea)
+            M = cv2.moments(c)
+            cX = int(M["m10"] / M["m00"])
+            cY = int(M["m01"] / M["m00"])
+            deltaSizePatch = int(sizePatch/2)
+            roiX = images[i][cY-deltaSizePatch:cY+deltaSizePatch, cX-deltaSizePatch:cX+deltaSizePatch]
+            listPatches.append(roiX)
+        X.append(listPatches)
+    return X 
         
-        
-def doLabels :
+def doLabels (X, xGT, folderGroundTruth, subFolderGroundTruth) :
+    Y = []
+    for i in range (len(X)) :
+        patches = X[i]
+        for j in range (len(patches)) :
+            
+    
+    
 #segmentsByX list of lists
 #xGT list of lists
 def doInputsAndLabelsFromSegments (images, segmentsByX, xGT, folderGroundTruth, subFolderGroundTruth, sizePatch) :
