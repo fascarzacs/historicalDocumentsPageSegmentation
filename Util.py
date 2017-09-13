@@ -130,10 +130,11 @@ def paintCentralPointsOrPatchesSegments (image, segments, radio, sizePatch, isPa
 
 def doInputs (images, segmentsByX, sizePatch) :
     X = [] #list of lists, a collection of patches
-    Y = [] #list of lists, a collection of labels of patches
+    listCentralPoints = []
     for i in range (len(segmentsByX)) :                                                
         segments = segmentsByX[i];
         listPatches = []
+        centralPoints = [] #list points
         for (j , segVal) in enumerate(np.unique(segments)) : 
             mask = np.zeros(images[i].shape[:2], dtype = "uint8")
             mask[segments == segVal] = 255
@@ -142,19 +143,23 @@ def doInputs (images, segmentsByX, sizePatch) :
             M = cv2.moments(c)
             cX = int(M["m10"] / M["m00"])
             cY = int(M["m01"] / M["m00"])
+            centralPoint = ([cX,cY])
             deltaSizePatch = int(sizePatch/2)
             roiX = images[i][cY-deltaSizePatch:cY+deltaSizePatch, cX-deltaSizePatch:cX+deltaSizePatch]
             listPatches.append(roiX)
+            centralPoints.append(centralPoint)
         X.append(listPatches)
-    return X 
+        listCentralPoints.append(centralPoints)
+    return X, listCentralPoints
         
-def doLabels (X, xGT, folderGroundTruth, subFolderGroundTruth) :
+def doLabels (images, X, xGT, folderGroundTruth, subFolderGroundTruth) :
     Y = []
     for i in range (len(X)) :
         patches = X[i]
         for j in range (len(patches)) :
+            patch = patches[j]
+            deltaSizePatch = int(patch.shape[0]/2)
             
-    
     
 #segmentsByX list of lists
 #xGT list of lists
