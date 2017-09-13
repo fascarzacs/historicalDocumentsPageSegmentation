@@ -128,6 +128,7 @@ def paintCentralPointsOrPatchesSegments (image, segments, radio, sizePatch, isPa
         else :
             cv2.circle(image, (cX, cY), radio, (0, 0, 255), -1)
 
+#segmentsByX is a list of lists
 def doInputs (images, segmentsByX, sizePatch) :
     X = [] #list of lists, a collection of patches
     listCentralPoints = []
@@ -146,20 +147,37 @@ def doInputs (images, segmentsByX, sizePatch) :
             centralPoint = ([cX,cY])
             deltaSizePatch = int(sizePatch/2)
             roiX = images[i][cY-deltaSizePatch:cY+deltaSizePatch, cX-deltaSizePatch:cX+deltaSizePatch]
-            listPatches.append(roiX)
-            centralPoints.append(centralPoint)
+            if roiX.shape[0] == sizePatch and roiX.shape[0] == sizePatch :
+                listPatches.append(roiX)
+                centralPoints.append(centralPoint)
+
         X.append(listPatches)
         listCentralPoints.append(centralPoints)
     return X, listCentralPoints
         
-def doLabels (images, X, xGT, folderGroundTruth, subFolderGroundTruth) :
-    Y = []
-    for i in range (len(X)) :
-        patches = X[i]
-        for j in range (len(patches)) :
-            patch = patches[j]
-            deltaSizePatch = int(patch.shape[0]/2)
-            
+#listCentralPoints is a list of lists    
+def doLabels (images, X, listCentralPoints, xGT, folderGroundTruth, subFolderGroundTruth) :
+    Y = []; listLabels = []
+    regions = ['page','text','decoration','comment']
+    for i in range (len(listCentralPoints)) :
+        points = listCentralPoints[i]
+        for j in range (len(points)) :
+            ([cX,cY]) = points[j]
+            for region in regions :
+                listPolygons = groundThruthFindCountourPointsByRegion(
+                               folderGroundTruth + "/" + subFolderGroundTruth + "/" + xGT[i],
+                               region)  
+                flag = False
+                    
+                for polygon in listPolygons :
+                    if isInsidePolygon(polygon, cX, cY) :
+                        listLabels.append(region)
+                        flag = True
+                        break
+                if flag == False :
+                    listLabels.append('periphery')
+        Y.append(listLabels)
+     
     
 #segmentsByX list of lists
 #xGT list of lists
