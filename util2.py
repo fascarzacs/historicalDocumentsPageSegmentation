@@ -8,6 +8,8 @@ from skimage import io
 from matplotlib import pyplot as plt
 import matplotlib.path as mplPath
 import xml.etree.ElementTree as ET
+from timeit import default_timer as timer
+from skimage.transform import rescale
 
 def plotImage(img, size):
     fig, ax = plt.subplots(figsize=(size,size))
@@ -40,11 +42,18 @@ def readPageImagesAndGroundTruth (folderPageImages, folderGroundTruth, subFolder
                     listGroundTruth.append(fileGroundTruth)
     return listImages, listGroundTruth
 
+#def resizeImages (images, factor):
+#    resizedImages = []
+#    for i in range (len(images)) :
+#        dim = (int(images[i].shape[1]*factor),int(images[1].shape[0]*factor))
+#        resizedImages.append(cv2.resize(images[i], dim, interpolation = cv2.INTER_AREA))
+#    return resizedImages
+
 def resizeImages (images, factor):
     resizedImages = []
     for i in range (len(images)) :
-        dim = (int(images[i].shape[1]*factor),int(images[1].shape[0]*factor))
-        resizedImages.append(cv2.resize(images[i], dim, interpolation = cv2.INTER_AREA))
+        image_rescaled = rescale(images[i], factor, mode='reflect')
+        resizedImages.append(image_rescaled)
     return resizedImages
 
 def groundThruthFindCountourPointsByRegion (pathGroundThruthFile, region) :
@@ -109,7 +118,7 @@ def paintPointsOutsideList (listPoints, image, B, G, R) :
 def segmentImageInSuperpixels (images, numSuperpixels) :
     listSegmentsByImage = []
     for i in range(len(images)) :
-        segments = slic(images[i], n_segments = numSuperpixels, sigma = 5)
+        segments = slic(images[i], n_segments = numSuperpixels, sigma = 1, enforce_connectivity=True)
         listSegmentsByImage.append(segments)
     #returns a list of lists
     return listSegmentsByImage
@@ -136,7 +145,7 @@ def doInputs (images, segmentsByX, sizePatch) :
     listCentralPoints = []
     listSuperPixelsProcessed = []
     for i in range (len(segmentsByX)) :                                                
-        segments = segmentsByX[i];
+        segments = segmentsByX[i]
         listPatches = []
         centralPoints = [] #list points
         superPixelsProcessed = []
@@ -154,7 +163,7 @@ def doInputs (images, segmentsByX, sizePatch) :
             if roiX.shape[0] == sizePatch and roiX.shape[1] == sizePatch :
                 listPatches.append(roiX)
                 centralPoints.append(centralPoint)
-                superPixelsProcessed.append(segVal)
+                superPixelsProcessed.append(mask)
         X.append(listPatches)
         listCentralPoints.append(centralPoints)
         listSuperPixelsProcessed.append(superPixelsProcessed)
