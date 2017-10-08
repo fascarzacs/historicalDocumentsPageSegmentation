@@ -10,6 +10,9 @@ import matplotlib.path as mplPath
 import xml.etree.ElementTree as ET
 from timeit import default_timer as timer
 from skimage.transform import rescale
+from skimage.color import rgb2gray
+import pickle
+from sklearn.preprocessing import LabelEncoder
 
 def plotImage(img, size):
     fig, ax = plt.subplots(figsize=(size,size))
@@ -30,7 +33,7 @@ def subplot(titles, images, rows, imgPerRows, size):
         plt.yticks([])
     plt.show()
     
-def readPageImagesAndGroundTruth (folderPageImages, folderGroundTruth, subFolderGroundTruth) :
+def readPageImagesAndGroundTruth (folderPageImages, folderGroundTruth, subFolderGroundTruth, factor) :
     listImages = []; listGroundTruth = []
     for fileGroundTruth in os.listdir(folderGroundTruth + "/" + subFolderGroundTruth) :
         if fileGroundTruth.endswith('.xml') :
@@ -40,6 +43,7 @@ def readPageImagesAndGroundTruth (folderPageImages, folderGroundTruth, subFolder
                     image = img_as_float(io.imread(folderPageImages + "/" + file))
                     listImages.append(image)
                     listGroundTruth.append(fileGroundTruth)
+    resizeImages(listImages, factor)
     return listImages, listGroundTruth
 
 #def resizeImages (images, factor):
@@ -49,13 +53,20 @@ def readPageImagesAndGroundTruth (folderPageImages, folderGroundTruth, subFolder
 #        resizedImages.append(cv2.resize(images[i], dim, interpolation = cv2.INTER_AREA))
 #    return resizedImages
 
-def resizeImages (images, factor):
+def resizeImages (images, factor) :
     resizedImages = []
     for i in range (len(images)) :
-        image_rescaled = rescale(images[i], factor, mode='reflect')
-        resizedImages.append(image_rescaled)
+        images[i] = rescale(images[i], factor, mode='reflect')
+        resizedImages.append(images[i])
     return resizedImages
 
+def convertToGrayscale(images) :
+    grayscalesImages = []
+    for i in range(len(images)):
+        images[i] = rgb2gray(images[i])
+        grayscalesImages.append(images[i])
+    return grayscalesImages
+        
 def groundThruthFindCountourPointsByRegion (pathGroundThruthFile, region) :
     listPixels = []
     polygonsByRegion = []
@@ -121,26 +132,28 @@ def segmentImageInSuperpixels (images, numSuperpixels) :
         segments = slic(images[i], n_segments = numSuperpixels, sigma = 1, enforce_connectivity=True)
         listSegmentsByImage.append(segments)
     #returns a list of lists
+    
     return listSegmentsByImage
 
-def paintCentralPointsOrPatchesSegments (image, segments, radio, sizePatch, isPatch) :
+def paintCentralPointsOrPatchesSegments (image, segments, radio, thickRect, sizePatch, isPatch) :
     for (j , segVal) in enumerate(np.unique(segments)) :    
         mask = np.zeros(image.shape[:2], dtype = "uint8")
         mask[segments == segVal] = 255
         cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
         c = max(cnts, key=cv2.contourArea)
         M = cv2.moments(c)
-        cX = int(M["m10"] / M["m00"])
-        cY = int(M["m01"] / M["m00"])
-        if isPatch :
-            deltaSizePatch = int(sizePatch/2)
-            cv2.rectangle(image,(cX-deltaSizePatch,cY-deltaSizePatch),(cX+deltaSizePatch,cY+deltaSizePatch),(0,0,1),5)   
-        else :
-            
-            cv2.circle(image, (cX, cY), radio, (0, 0, 1), -1)
+        if M["m00"] != 0 :
+            cX = int(M["m10"] / M["m00"])
+            cY = int(M["m01"] / M["m00"])
+            if isPatch :
+                deltaSizePatch = int(sizePatch/2)
+                cv2.rectangle(image,(cX-deltaSizePatch,cY-deltaSizePatch),
+                              (cX+deltaSizePatch,cY+deltaSizePatch),(0,0,1),thickRect)     
+            else:           
+                cv2.circle(image, (cX, cY), radio, (0, 0, 1), -1)
 
 #segmentsByX is a list of lists
-def doInputs (images, segmentsByX, sizePatch) :
+def doInputs (images, segmentsByX, sizePatch, event) :
     X = [] #list of lists, a collection of patches
     listCentralPoints = []
     listSuperPixelsProcessed = []
@@ -153,28 +166,32 @@ def doInputs (images, segmentsByX, sizePatch) :
             mask = np.zeros(images[i].shape[:2], dtype = "uint8")
             mask[segments == segVal] = 255
             cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
-            c = max(cnts, key=cv2.contourArea)
-            M = cv2.moments(c)
-            cX = int(M["m10"] / M["m00"])
-            cY = int(M["m01"] / M["m00"])
-            centralPoint = ([cX,cY])
-            deltaSizePatch = int(sizePatch/2)
-            roiX = images[i][cY-deltaSizePatch:cY+deltaSizePatch, cX-deltaSizePatch:cX+deltaSizePatch]
-            if roiX.shape[0] == sizePatch and roiX.shape[1] == sizePatch :
-                listPatches.append(roiX)
-                centralPoints.append(centralPoint)
-                superPixelsProcessed.append(mask)
+            if np.array(cnts).size != 0:
+                c = max(cnts, key=cv2.contourArea)
+                M = cv2.moments(c)
+                if M["m00"] != 0 :
+                    cX = int(M["m10"] / M["m00"])
+                    cY = int(M["m01"] / M["m00"])
+                    centralPoint = ([cX,cY])
+                    deltaSizePatch = int(sizePatch/2)
+                    roiX = images[i][cY-deltaSizePatch:cY+deltaSizePatch, cX-deltaSizePatch:cX+deltaSizePatch]
+                    roiX = rgb2gray(roiX)
+                    if roiX.shape[0] == sizePatch and roiX.shape[1] == sizePatch :
+                        listPatches.append(roiX)
+                        centralPoints.append(centralPoint)
+                        superPixelsProcessed.append(mask)
         X.append(listPatches)
         listCentralPoints.append(centralPoints)
-        listSuperPixelsProcessed.append(superPixelsProcessed)
+        listSuperPixelsProcessed.append(superPixelsProcessed)        
     return X, listCentralPoints, listSuperPixelsProcessed
 
 #listCentralPoints is a list of lists    
-def doLabels (listCentralPoints, xGT, folderGroundTruth, subFolderGroundTruth) :
+def doLabels (listCentralPoints, xGT, folderGroundTruth, subFolderGroundTruth, factor) :
     Y = []; listLabels = []
     regions = ['text','decoration','comment','page']
     for i in range (len(listCentralPoints)) :
         points = listCentralPoints[i]
+        listLabels = []
         for j in range (len(points)) :
             ([cX,cY]) = points[j]
             for k in range(len(regions)) :
@@ -184,7 +201,7 @@ def doLabels (listCentralPoints, xGT, folderGroundTruth, subFolderGroundTruth) :
                 flag = False
                 flagPointProcessed = False    
                 for polygon in listPolygons :
-                    if isInsidePolygon(polygon, cX, cY) :
+                    if isInsidePolygon(polygon, cX*factor, cY*factor) :
                         listLabels.append(regions[k])
                         flag = True
                         flagPointProcessed = True
@@ -194,6 +211,27 @@ def doLabels (listCentralPoints, xGT, folderGroundTruth, subFolderGroundTruth) :
                     break
             else :
                 listLabels.append('periphery')
-                
         Y.append(listLabels)
     return Y
+
+def saveObject (var, path) :
+    filehandlerObject = open(path, 'wb')
+    pickle.dump(var, filehandlerObject)
+    
+def readObject (path) :
+    filehandlerReadObject = open(path, 'rb') 
+    var = pickle.load(filehandlerReadObject)
+    return var
+
+def integerEncoded (labels) :
+    label_encoder = LabelEncoder()
+    integer_encoded = label_encoder.fit_transform(labels)
+    return integer_encoded
+
+def consolidateInputsAndOutputs (XTemp, YTemp) :
+    x = []; y = []
+    for i in range (len(XTemp)) :
+        for j in range (len(XTemp[i])) :
+            x.append(XTemp[i][j])
+            y.append(YTemp[i][j])
+    return np.array(x), np.array(y)
