@@ -33,17 +33,6 @@ def subplot(titles, images, rows, imgPerRows, size):
         plt.yticks([])
     plt.show()
     
-def subplot(titles, images, rows, imgPerRows, size):
-    fig, ax = plt.subplots(figsize=(size,size))
-    for i in range(len(images)):
-        plt.subplot(rows,imgPerRows,i+1),
-        #plt.imshow(cv2.cvtColor(images[i], cv2.COLOR_BGR2RGB))
-        plt.imshow(images[i])
-        plt.title(titles[i])
-        plt.xticks([]),
-        plt.yticks([])
-    plt.show()    
-    
 def readPageImagesAndGroundTruth (folderPageImages, folderGroundTruth, subFolderGroundTruth, factor) :
     listImages = []; listGroundTruth = []
     for fileGroundTruth in os.listdir(folderGroundTruth + "/" + subFolderGroundTruth) :
@@ -246,3 +235,15 @@ def consolidateInputsAndOutputs (XTemp, YTemp) :
             x.append(XTemp[i][j])
             y.append(YTemp[i][j])
     return np.array(x), np.array(y)
+
+def joinListParches (list1, list2) :
+    listJoined = []
+    for i in range (len(list1)):
+        patch = list1[i]
+        listJoined.append(patch)
+        
+    for j in range (len(list2)):
+        patch = list2[j]
+        listJoined.append(patch)
+    return listJoined
+        
