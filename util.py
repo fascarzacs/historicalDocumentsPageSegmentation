@@ -103,7 +103,9 @@ def paintPolygon (listPointPolygonRegion, listPointsInsidePolygon, image, factor
             yPos = yPos + 1 #Increment Y position by 1
 
         yPos = 0
-        xPos = xPos + 1 #Increment X position by 1    
+        xPos = xPos + 1 #Increment X position by 1
+        
+def painGroundTruthImage (image, )
         
 def paintPointsOutsideList (listPoints, image, B, G, R) :
     imageWidth = image.shape[1] #Get image width
@@ -195,13 +197,22 @@ def doLabels (listCentralPoints, xGT, folderGroundTruth, subFolderGroundTruth, f
         for j in range (len(points)) :
             ([cX,cY]) = points[j]
             for k in range(len(regions)) :
+                
                 listPolygons = groundThruthFindCountourPointsByRegion(
                                folderGroundTruth + "/" + subFolderGroundTruth + "/" + xGT[i],
                                regions[k])
                 flag = False
                 flagPointProcessed = False    
                 for polygon in listPolygons :
+                    
                     if isInsidePolygon(polygon, cX*factor, cY*factor) :
+                        
+                        if regions[k] == 'comment' : 
+                            listLabels.append('page')
+                            flag = True
+                            flagPointProcessed = True
+                            break                           
+                        
                         listLabels.append(regions[k])
                         flag = True
                         flagPointProcessed = True
@@ -246,4 +257,6 @@ def joinListParches (list1, list2) :
         patch = list2[j]
         listJoined.append(patch)
     return listJoined
+        
+            
         
