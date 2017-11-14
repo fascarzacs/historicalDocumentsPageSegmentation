@@ -13,6 +13,7 @@ from skimage.transform import rescale
 from skimage.color import rgb2gray
 import pickle
 from sklearn.preprocessing import LabelEncoder
+from PIL import Image, ImageDraw
 
 def plotImage(img, size):
     fig, ax = plt.subplots(figsize=(size,size))
@@ -46,13 +47,6 @@ def readPageImagesAndGroundTruth (folderPageImages, folderGroundTruth, subFolder
     resizeImages(listImages, factor)
     return listImages, listGroundTruth
 
-#def resizeImages (images, factor):
-#    resizedImages = []
-#    for i in range (len(images)) :
-#        dim = (int(images[i].shape[1]*factor),int(images[1].shape[0]*factor))
-#        resizedImages.append(cv2.resize(images[i], dim, interpolation = cv2.INTER_AREA))
-#    return resizedImages
-
 def resizeImages (images, factor) :
     resizedImages = []
     for i in range (len(images)) :
@@ -70,6 +64,7 @@ def convertToGrayscale(images) :
 def groundThruthFindCountourPointsByRegion (pathGroundThruthFile, region) :
     listPixels = []
     polygonsByRegion = []
+    polygonTuplesByRegion = []
     pointsPolygon = []
     tree = ET.parse(pathGroundThruthFile)
     root = tree.getroot()
@@ -105,7 +100,29 @@ def paintPolygon (listPointPolygonRegion, listPointsInsidePolygon, image, factor
         yPos = 0
         xPos = xPos + 1 #Increment X position by 1
         
-def painGroundTruthImage (image, )
+def paintGroundTruthImage (image, gt, folderGroundTruth, subFolderGroundTruth, factor) :
+    imageC = image.copy()
+    imageC = rescale(imageC, factor, mode='reflect')
+    imageC[:,:] = (0,0,0)
+    regions = ['page','text','decoration']
+    listLabels = []
+    for k in range(len(regions)) :
+        listPolygons = groundThruthFindCountourPointsByRegion(
+            folderGroundTruth + "/" + subFolderGroundTruth + "/" + gt,
+            regions[k])
+
+        flagPointProcessed = False    
+        for polygon in listPolygons :
+            polygon = np.int32([polygon])
+            pts = polygon.reshape((-1,1,2))
+            if regions[k] == 'text':
+                cv2.fillConvexPoly(imageC,pts,(0,0,1), cv2.LINE_AA)
+            elif regions[k] == 'decoration':
+                cv2.fillConvexPoly(imageC,pts,(1,0,0), cv2.LINE_AA)
+            elif regions[k] == 'page':
+                cv2.fillConvexPoly(imageC,pts,(1,1,1), cv2.LINE_AA)
+    imageC = rescale(imageC, factor**-1, mode='reflect')
+    return imageC
         
 def paintPointsOutsideList (listPoints, image, B, G, R) :
     imageWidth = image.shape[1] #Get image width
@@ -190,7 +207,7 @@ def doInputs (images, segmentsByX, sizePatch, event) :
 #listCentralPoints is a list of lists    
 def doLabels (listCentralPoints, xGT, folderGroundTruth, subFolderGroundTruth, factor) :
     Y = []; listLabels = []
-    regions = ['text','decoration','comment','page']
+    regions = ['text','decoration','page']
     for i in range (len(listCentralPoints)) :
         points = listCentralPoints[i]
         listLabels = []
@@ -206,12 +223,6 @@ def doLabels (listCentralPoints, xGT, folderGroundTruth, subFolderGroundTruth, f
                 for polygon in listPolygons :
                     
                     if isInsidePolygon(polygon, cX*factor, cY*factor) :
-                        
-                        if regions[k] == 'comment' : 
-                            listLabels.append('page')
-                            flag = True
-                            flagPointProcessed = True
-                            break                           
                         
                         listLabels.append(regions[k])
                         flag = True
@@ -259,4 +270,3 @@ def joinListParches (list1, list2) :
     return listJoined
         
             
-        
