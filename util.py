@@ -47,6 +47,20 @@ def readPageImagesAndGroundTruth (folderPageImages, folderGroundTruth, subFolder
     resizeImages(listImages, factor)
     return listImages, listGroundTruth
 
+def unetReadPageImagesAndGroundTruth (folderPageImages, folderGroundTruth, subFolderGroundTruth, factor) :
+    listImages = []; listGroundTruth = []; listFileNames = []
+    for fileGroundTruth in os.listdir(folderGroundTruth + "/" + subFolderGroundTruth) :
+        if fileGroundTruth.endswith('.xml') :
+            for file in os.listdir(folderPageImages) :
+                if file.endswith('.jpg') and fileGroundTruth.find(file[0:5]) > -1 :
+                    #image = cv2.imread(folderPageImages + "/" + file)
+                    image = img_as_float(io.imread(folderPageImages + "/" + file))
+                    listFileNames.append(file)
+                    listImages.append(image)
+                    listGroundTruth.append(fileGroundTruth)
+    resizeImages(listImages, factor)
+    return listImages, listGroundTruth, listFileNames
+
 def resizeImages (images, factor) :
     resizedImages = []
     for i in range (len(images)) :
@@ -104,7 +118,7 @@ def paintGroundTruthImage (image, gt, folderGroundTruth, subFolderGroundTruth, f
     imageC = image.copy()
     imageC = rescale(imageC, factor, mode='reflect')
     imageC[:,:] = (0,0,0)
-    regions = ['page','text','decoration']
+    regions = ['page','text','decoration', 'comment']
     listLabels = []
     for k in range(len(regions)) :
         listPolygons = groundThruthFindCountourPointsByRegion(
@@ -121,6 +135,9 @@ def paintGroundTruthImage (image, gt, folderGroundTruth, subFolderGroundTruth, f
                 cv2.fillConvexPoly(imageC,pts,(1,0,0), cv2.LINE_AA)
             elif regions[k] == 'page':
                 cv2.fillConvexPoly(imageC,pts,(1,1,1), cv2.LINE_AA)
+            elif regions[k] == 'comment':
+                cv2.fillConvexPoly(imageC,pts,(0,1,0), cv2.LINE_AA)  
+                #cv2.fillConvexPoly(imageC,pts,(1, 0.75, 0.8), cv2.LINE_AA)                
     imageC = rescale(imageC, factor**-1, mode='reflect')
     return imageC
         
@@ -207,7 +224,7 @@ def doInputs (images, segmentsByX, sizePatch, event) :
 #listCentralPoints is a list of lists    
 def doLabels (listCentralPoints, xGT, folderGroundTruth, subFolderGroundTruth, factor) :
     Y = []; listLabels = []
-    regions = ['text','decoration','page']
+    regions = ['text','decoration','comment', 'page']
     for i in range (len(listCentralPoints)) :
         points = listCentralPoints[i]
         listLabels = []
@@ -250,13 +267,14 @@ def integerEncoded (labels) :
     integer_encoded = label_encoder.fit_transform(labels)
     return integer_encoded
 
-def consolidateInputsAndOutputs (XTemp, YTemp) :
-    x = []; y = []
+def consolidateInputsAndOutputs (XTemp, YTemp, XSuperpixeles) :
+    x = []; y = []; superpixeles = []
     for i in range (len(XTemp)) :
         for j in range (len(XTemp[i])) :
             x.append(XTemp[i][j])
             y.append(YTemp[i][j])
-    return np.array(x), np.array(y)
+            superpixeles.append(XSuperpixeles[i][j])
+    return np.array(x), np.array(y), superpixeles
 
 def joinListParches (list1, list2) :
     listJoined = []
@@ -268,5 +286,58 @@ def joinListParches (list1, list2) :
         patch = list2[j]
         listJoined.append(patch)
     return listJoined
+
+def calculateAreaByRegion(ximg, xgt, folderGroundTruth, subFolderGroundTruth, factor) :
+    regions = ['page','text','decoration', 'comment']
+    xpixels_segments = []
+    countPixelsTotal = []
+    totalPeriphery = 0
+    totalPage = 0
+    totalText = 0
+    totalDecoration = 0
+    totalComment = 0
+    #index areasByRegion: peripheric page text decoration
+    for i in range (len(ximg)) :
+        areasByRegion = []
+        areasByRegionFinal = []
+        imageWidth  =  ximg[i].shape[1]*factor #Get image width
+        imageHeight =  ximg[i].shape[0]*factor #Get image height
+        totalArea = imageWidth * imageHeight
+        for k in range(len(regions)) :
+            listPolygons = groundThruthFindCountourPointsByRegion(folderGroundTruth+"/"+subFolderGroundTruth+"/"+xgt[i], regions[k])
+            totalAreaByRegion = 0
+            for polygon in listPolygons :
+                contour = np.array(polygon, np.int32)
+                area = cv2.contourArea(contour)
+                totalAreaByRegion = totalAreaByRegion + area
+            areasByRegion.append(totalAreaByRegion)
+
+        areaPeripheric = totalArea - areasByRegion[0] #total - page
+        areaPage = areasByRegion[0] - areasByRegion[1] - areasByRegion[2] - areasByRegion[3]#page - text - decoration - comment
+        areaText = areasByRegion[1] #same
+        areaDecoration = areasByRegion[2] #same
+        areaComment = areasByRegion[3] #same
+        
+        totalPeriphery = totalPeriphery + areaPeripheric
+        totalPage = totalPage + areaPage
+        totalText = totalText + areaText
+        totalDecoration = totalDecoration + areaDecoration
+        totalComment = totalComment + areaComment
+        
+        areasByRegionFinal.append(areaPeripheric)
+        areasByRegionFinal.append(areaPage)
+        areasByRegionFinal.append(areaText)
+        areasByRegionFinal.append(areaDecoration)
+        areasByRegionFinal.append(areaComment)
+
+        xpixels_segments.append(areasByRegionFinal)
+        
+    countPixelsTotal.append(totalPeriphery)
+    countPixelsTotal.append(totalPage)
+    countPixelsTotal.append(totalText)
+    countPixelsTotal.append(totalDecoration)
+    countPixelsTotal.append(totalComment)
+    
+    return xpixels_segments, countPixelsTotal
         
             
